@@ -371,5 +371,5 @@ app.get('/users', verifyAuth, async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 8000;
+const PORT = parseInt(process.env.PORT || '8000', 10);
 app.listen(PORT, '0.0.0.0', () => console.log(`CircleBuy server listening on 0.0.0.0:${PORT}`));
