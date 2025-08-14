@@ -4,7 +4,7 @@
   "description": "CircleBuy - Secure Marketplace App",
   "main": "server/dist/index.js",
   "scripts": {
-    "build": "cd server && npm install && npx tsc",
+    "build": "cd server && npm install && npx tsc --project .",
     "start": "cd server && node dist/index.js",
     "dev": "cd server && npm run dev"
   },
