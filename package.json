@@ -6,8 +6,7 @@
   "scripts": {
     "build": "cd server && npm install && npx tsc",
     "start": "cd server && node dist/index.js",
-    "dev": "cd server && npm run dev",
-    "postinstall": "cd server && npm install"
+    "dev": "cd server && npm run dev"
   },
   "repository": {
     "type": "git",
