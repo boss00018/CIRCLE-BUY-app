@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'super_admin' || request.auth.token.email == 'circlebuy0018@gmail.com'
+      );
+    }
+
+    function isAdminFor(marketplaceId) {
+      return isSignedIn() && request.auth.token.role == 'admin' && request.auth.token.marketplaceId == marketplaceId;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSuperAdmin();
+      allow create: if isOwner(request.auth.uid);
+      allow update: if isOwner(userId) || isSuperAdmin();
+    }
+
+    match /marketplaces/{marketplaceId} {
+      allow read: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if resource.data.status == 'approved' || isOwner(resource.data.sellerId) || isAdminFor(resource.data.marketplaceId) || isSuperAdmin();
+      allow create: if isOwner(request.auth.uid);
+      allow update: if (
+        // owner can edit before approval or when needs_changes
+        (isOwner(resource.data.sellerId) && (resource.data.status in ['pending', 'needs_changes'])) ||
+        isAdminFor(resource.data.marketplaceId) || isSuperAdmin()
+      );
+      allow delete: if isAdminFor(resource.data.marketplaceId) || isOwner(resource.data.sellerId) || isSuperAdmin();
+    }
+
+    match /donations/{donationId} {
+      allow read: if resource.data.status == 'approved' || isOwner(resource.data.userId) || isAdminFor(resource.data.marketplaceId) || isSuperAdmin();
+      allow create: if isOwner(request.auth.uid);
+      allow update, delete: if isOwner(resource.data.userId) || isAdminFor(resource.data.marketplaceId) || isSuperAdmin();
+    }
+
+    match /requests/{requestId} {
+      allow read: if resource.data.status == 'accepted' || isOwner(resource.data.userId) || isAdminFor(resource.data.marketplaceId) || isSuperAdmin();
+      allow create: if isOwner(request.auth.uid);
+      allow update, delete: if isOwner(resource.data.userId) || isAdminFor(resource.data.marketplaceId) || isSuperAdmin();
+    }
+
+    match /lost_found/{postId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isOwner(resource.data.userId) || isAdminFor(resource.data.marketplaceId) || isSuperAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create, update, delete: if isAdminFor(request.resource.data.marketplaceId) || isSuperAdmin();
+    }
+
+    // Messages under conversations
+    match /messages/{convId}/items/{messageId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isOwner(resource.data.senderId) || isAdminFor(resource.data.marketplaceId) || isSuperAdmin();
+    }
+  }
+}
