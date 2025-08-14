@@ -67,9 +67,9 @@ export default function LoginScreen() {
         const token = await userCredential.user.getIdToken();
         console.log('Got Firebase token:', token ? 'Present' : 'Missing');
         console.log('Token length:', token?.length || 0);
-        console.log('Trying to connect to backend at: http://192.168.0.8:8000');
+        console.log('Trying to connect to backend at:', envConfig.SERVER_URL);
         
-        const response = await fetch('http://192.168.0.8:8000/auth/assign-role', {
+        const response = await fetch(`${envConfig.SERVER_URL}/auth/assign-role`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
