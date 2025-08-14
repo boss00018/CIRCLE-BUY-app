@@ -11,5 +11,5 @@ export interface EnvConfig {
 export const ENV: EnvConfig = {
   FIREBASE_WEB_CLIENT_ID: "your-firebase-web-client-id-here",
   SERVER_URL: "https://circlebuy-server.onrender.com",
-  NODE_ENV: "development"
+  NODE_ENV: "production"
 };
