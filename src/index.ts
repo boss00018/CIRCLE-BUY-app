@@ -7,8 +7,14 @@ import { z } from 'zod';
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
+  const serviceAccount = process.env.GOOGLE_APPLICATION_CREDENTIALS 
+    ? JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+    : undefined;
+    
   admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+    credential: serviceAccount 
+      ? admin.credential.cert(serviceAccount)
+      : admin.credential.applicationDefault(),
   });
 }
 
