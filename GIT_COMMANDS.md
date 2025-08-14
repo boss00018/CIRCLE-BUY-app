@@ -31,7 +31,7 @@ git push origin main
 ## Alternative if you need to set remote:
 ```bash
 # If remote not set, add it first
-git remote add origin https://github.com/yourusername/circlebuy-reactnative.git
+git remote add origin https://github.com/boss00018/CIRCLE-BUY-app.git
 
 # Then push
 git push -u origin main
