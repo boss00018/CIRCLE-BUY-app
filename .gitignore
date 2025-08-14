@@ -17,7 +17,6 @@ GoogleService-Info.plist
 firebase-debug.log
 firebase-debug.*.log
 .firebase/
-*.json
 service-account*.json
 firebase-adminsdk*.json
 
