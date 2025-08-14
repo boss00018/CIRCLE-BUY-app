@@ -2,16 +2,20 @@
   "name": "circlebuy-app",
   "version": "1.0.0",
   "description": "CircleBuy - Secure Marketplace App",
-  "main": "server/src/index.js",
+  "main": "server/dist/index.js",
   "scripts": {
-    "build": "cd server && npm install && npm run build",
-    "start": "cd server && npm start",
-    "dev": "cd server && npm run dev"
+    "build": "cd server && npm install && npx tsc",
+    "start": "cd server && node dist/index.js",
+    "dev": "cd server && npm run dev",
+    "postinstall": "cd server && npm install"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/boss00018/CIRCLE-BUY-app.git"
   },
   "author": "CircleBuy Team",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
