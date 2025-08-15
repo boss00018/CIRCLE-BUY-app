@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
-import firestore from '@react-native-firebase/firestore';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { superAdminApi } from '../../services/api';
 
 interface Stats {
   totalUsers: number;
@@ -22,47 +22,29 @@ export default function SuperAdminDashboard() {
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, totalProducts: 0, pendingProducts: 0, totalMarketplaces: 0 });
   const [loading, setLoading] = useState(true);
 
+  const loadStats = async () => {
+    try {
+      const data = await superAdminApi.getStats();
+      setStats({
+        totalUsers: data.totalUsers,
+        totalProducts: data.totalProducts,
+        pendingProducts: data.pendingProducts,
+        totalMarketplaces: data.totalMarketplaces
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Real-time listeners for dashboard stats
-    const unsubscribeMarketplaces = firestore()
-      .collection('marketplaces')
-      .onSnapshot(
-        (snapshot) => {
-          const marketplaceCount = snapshot.size;
-          setStats(prev => ({ ...prev, totalMarketplaces: marketplaceCount }));
-        },
-        (error) => {} // Silent error handling
-      );
+    loadStats();
     
-    const unsubscribeProducts = firestore()
-      .collection('products')
-      .onSnapshot(
-        (snapshot) => {
-          const totalProducts = snapshot.size;
-          const pendingProducts = snapshot.docs.filter(doc => doc.data().status === 'pending').length;
-          setStats(prev => ({ ...prev, totalProducts, pendingProducts }));
-        },
-        (error) => {} // Silent error handling
-      );
+    // Refresh stats every 10 seconds
+    const interval = setInterval(loadStats, 10000);
     
-    const unsubscribeUsers = firestore()
-      .collection('users')
-      .onSnapshot(
-        (snapshot) => {
-          const totalUsers = snapshot.size;
-          setStats(prev => ({ ...prev, totalUsers }));
-          setLoading(false);
-        },
-        (error) => {
-          setLoading(false);
-        }
-      );
-    
-    return () => {
-      unsubscribeMarketplaces();
-      unsubscribeProducts();
-      unsubscribeUsers();
-    };
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

@@ -181,6 +181,48 @@ app.get('/marketplaces', verifyAuth, async (req, res) => {
   }
 });
 
+// Get super admin stats
+app.get('/super-admin/stats', verifyAuth, async (req, res) => {
+  try {
+    const caller = (req as any).user as admin.auth.DecodedIdToken;
+    if (caller.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+    
+    // Get marketplace count
+    const marketplacesSnapshot = await admin.firestore().collection('marketplaces').get();
+    const totalMarketplaces = marketplacesSnapshot.size;
+    
+    // Get active marketplace IDs
+    const activeMarketplaceIds = marketplacesSnapshot.docs.map(doc => doc.id);
+    
+    // Get products count (only from active marketplaces)
+    const productsSnapshot = await admin.firestore().collection('products').get();
+    const validProducts = productsSnapshot.docs.filter(doc => {
+      const data = doc.data();
+      return activeMarketplaceIds.includes(data.marketplaceId);
+    });
+    const totalProducts = validProducts.length;
+    const pendingProducts = validProducts.filter(doc => doc.data().status === 'pending').length;
+    
+    // Get users count (only from active marketplaces)
+    const usersSnapshot = await admin.firestore().collection('users').get();
+    const validUsers = usersSnapshot.docs.filter(doc => {
+      const data = doc.data();
+      return activeMarketplaceIds.includes(data.marketplaceId);
+    });
+    const totalUsers = validUsers.length;
+    
+    return res.json({
+      totalMarketplaces,
+      totalProducts,
+      pendingProducts,
+      totalUsers
+    });
+  } catch (error) {
+    console.error('Error fetching super admin stats:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Delete marketplace
 app.delete('/marketplaces/:id', verifyAuth, async (req, res) => {
   try {
@@ -211,18 +253,29 @@ app.delete('/marketplaces/:id', verifyAuth, async (req, res) => {
     await deleteCollection('donations', 'marketplaceId');
     await deleteCollection('messages', 'marketplaceId');
     
-    // Delete Firebase Auth users with this marketplace ID
-    const listUsersResult = await admin.auth().listUsers(1000);
-    for (const userRecord of listUsersResult.users) {
-      const claims = userRecord.customClaims;
-      if (claims?.marketplaceId === marketplaceId) {
-        try {
-          await admin.auth().deleteUser(userRecord.uid);
-        } catch (error) {
-          console.error(`Failed to delete user ${userRecord.uid}:`, error);
+    // Delete Firebase Auth users with this marketplace ID using recursive deletion
+    const deleteUsersRecursively = async (nextPageToken?: string) => {
+      const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
+      
+      for (const userRecord of listUsersResult.users) {
+        const claims = userRecord.customClaims;
+        if (claims?.marketplaceId === marketplaceId) {
+          try {
+            await admin.auth().deleteUser(userRecord.uid);
+            console.log(`Deleted user: ${userRecord.email} (${userRecord.uid})`);
+          } catch (error) {
+            console.error(`Failed to delete user ${userRecord.uid}:`, error);
+          }
         }
       }
-    }
+      
+      // Continue with next page if exists
+      if (listUsersResult.pageToken) {
+        await deleteUsersRecursively(listUsersResult.pageToken);
+      }
+    };
+    
+    await deleteUsersRecursively();
     
     // Delete marketplace
     await admin.firestore().collection('marketplaces').doc(marketplaceId).delete();
@@ -276,19 +329,30 @@ app.post('/cleanup-orphaned-data', verifyAuth, async (req, res) => {
       }
     }
     
-    // Delete Firebase Auth users with orphaned marketplace IDs
-    const listUsersResult = await admin.auth().listUsers(1000);
-    for (const userRecord of listUsersResult.users) {
-      const claims = userRecord.customClaims;
-      if (claims?.marketplaceId && !activeMarketplaceIds.includes(claims.marketplaceId)) {
-        try {
-          await admin.auth().deleteUser(userRecord.uid);
-          clearedUsersCount++;
-        } catch (error) {
-          console.error(`Failed to delete user ${userRecord.uid}:`, error);
+    // Delete Firebase Auth users with orphaned marketplace IDs using recursive deletion
+    const deleteOrphanedUsersRecursively = async (nextPageToken?: string) => {
+      const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
+      
+      for (const userRecord of listUsersResult.users) {
+        const claims = userRecord.customClaims;
+        if (claims?.marketplaceId && !activeMarketplaceIds.includes(claims.marketplaceId)) {
+          try {
+            await admin.auth().deleteUser(userRecord.uid);
+            clearedUsersCount++;
+            console.log(`Deleted orphaned user: ${userRecord.email} (${userRecord.uid})`);
+          } catch (error) {
+            console.error(`Failed to delete user ${userRecord.uid}:`, error);
+          }
         }
       }
-    }
+      
+      // Continue with next page if exists
+      if (listUsersResult.pageToken) {
+        await deleteOrphanedUsersRecursively(listUsersResult.pageToken);
+      }
+    };
+    
+    await deleteOrphanedUsersRecursively();
     
     return res.json({ 
       success: true, 

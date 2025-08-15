@@ -27,22 +27,19 @@ export default function Users() {
 
     const unsubscribe = firestore()
       .collection('users')
+      .where('marketplaceId', '==', marketplaceId)
       .onSnapshot(
         (snapshot) => {
-          const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as User);
-          const filteredUsers = allUsers.filter(user => 
-            user.marketplaceId === marketplaceId || !user.marketplaceId
-          );
+          const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as User);
           
-          console.log('All users found:', allUsers.length);
-          console.log('Filtered users for marketplace:', filteredUsers.length);
-          console.log('Users data:', filteredUsers);
+          console.log('Users found for marketplace:', users.length);
+          console.log('Users data:', users);
           
-          setUsers(filteredUsers);
+          setUsers(users);
           setLoading(false);
         },
         (error) => {
-          // Silently handle permission errors
+          console.error('Error loading users:', error);
           setLoading(false);
         }
       );

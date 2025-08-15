@@ -104,3 +104,21 @@ export const messagesApi = {
   getAll: (chatWith?: string) =>
     apiRequest(`/messages${chatWith ? `?chatWith=${chatWith}` : ''}`),
 };
+
+export const superAdminApi = {
+  getStats: () => apiRequest('/super-admin/stats'),
+  
+  getMarketplaces: () => apiRequest('/marketplaces'),
+  
+  createMarketplace: (data: { name: string; domain: string; adminEmail: string }) =>
+    apiRequest('/marketplaces/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  deleteMarketplace: (id: string) =>
+    apiRequest(`/marketplaces/${id}`, { method: 'DELETE' }),
+  
+  cleanupOrphanedData: () =>
+    apiRequest('/cleanup-orphaned-data', { method: 'POST' }),
+};
