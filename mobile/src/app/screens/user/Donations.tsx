@@ -28,10 +28,16 @@ export default function Donations() {
     if (activeTab === 'view') {
       const loadApprovedDonations = async () => {
         try {
+          const user = auth().currentUser;
+          if (!user) {
+            console.log('User not authenticated');
+            return;
+          }
           const response = await donationsApi.getAll('approved');
           setDonations(response.donations || []);
         } catch (error) {
           console.error('Error loading donations:', error);
+          setDonations([]);
         }
       };
       
@@ -44,6 +50,12 @@ export default function Donations() {
   const handleSubmit = async () => {
     if (!itemName.trim() || !description.trim() || !contactDetails.trim()) {
       Alert.alert('Missing Fields', 'Please fill all required fields.');
+      return;
+    }
+
+    const user = auth().currentUser;
+    if (!user) {
+      Alert.alert('Error', 'Please login to submit a donation.');
       return;
     }
 
@@ -61,6 +73,7 @@ export default function Donations() {
       setContactDetails('');
       setActiveTab('view');
     } catch (error: any) {
+      console.error('Submit error:', error);
       Alert.alert('Error', error.message || 'Failed to submit donation');
     } finally {
       setSubmitting(false);

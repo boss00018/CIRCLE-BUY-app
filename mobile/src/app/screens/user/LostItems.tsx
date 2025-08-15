@@ -33,10 +33,16 @@ export default function LostItems() {
     if (activeTab === 'view') {
       const loadApprovedItems = async () => {
         try {
+          const user = auth().currentUser;
+          if (!user) {
+            console.log('User not authenticated');
+            return;
+          }
           const response = await lostItemsApi.getAll('approved');
           setLostItems(response.items || []);
         } catch (error) {
           console.error('Error loading lost items:', error);
+          setLostItems([]);
         }
       };
       
@@ -49,6 +55,12 @@ export default function LostItems() {
   const handleSubmit = async () => {
     if (!itemName.trim() || !description.trim() || !contactDetails.trim()) {
       Alert.alert('Missing Fields', 'Please fill all required fields.');
+      return;
+    }
+
+    const user = auth().currentUser;
+    if (!user) {
+      Alert.alert('Error', 'Please login to submit a report.');
       return;
     }
 
@@ -66,6 +78,7 @@ export default function LostItems() {
       setContactDetails('');
       setActiveTab('view');
     } catch (error: any) {
+      console.error('Submit error:', error);
       Alert.alert('Error', error.message || 'Failed to submit report');
     } finally {
       setSubmitting(false);

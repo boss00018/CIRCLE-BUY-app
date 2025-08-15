@@ -34,10 +34,16 @@ export default function RequestProducts() {
     if (activeTab === 'view') {
       const loadApprovedRequests = async () => {
         try {
+          const user = auth().currentUser;
+          if (!user) {
+            console.log('User not authenticated');
+            return;
+          }
           const response = await productRequestsApi.getAll('approved');
           setRequests(response.requests || []);
         } catch (error) {
           console.error('Error loading requests:', error);
+          setRequests([]);
         }
       };
       
@@ -50,6 +56,12 @@ export default function RequestProducts() {
   const handleSubmit = async () => {
     if (!productName.trim() || !description.trim() || !contactDetails.trim()) {
       Alert.alert('Missing Fields', 'Please fill all required fields.');
+      return;
+    }
+
+    const user = auth().currentUser;
+    if (!user) {
+      Alert.alert('Error', 'Please login to submit a request.');
       return;
     }
 
@@ -67,6 +79,7 @@ export default function RequestProducts() {
       setContactDetails('');
       setActiveTab('view');
     } catch (error: any) {
+      console.error('Submit error:', error);
       Alert.alert('Error', error.message || 'Failed to submit request');
     } finally {
       setSubmitting(false);

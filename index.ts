@@ -237,8 +237,13 @@ const ProductRequestSchema = z.object({
 app.post('/product-requests', verifyAuth, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
+    console.log('Product request from user:', caller.email, 'marketplace:', caller.marketplaceId);
+    
     const parsed = ProductRequestSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    if (!parsed.success) {
+      console.log('Validation error:', parsed.error);
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
 
     const { productName, description, contactDetails } = parsed.data;
     
@@ -248,11 +253,12 @@ app.post('/product-requests', verifyAuth, async (req, res) => {
       contactDetails,
       requesterId: caller.uid,
       requesterEmail: caller.email,
-      marketplaceId: caller.marketplaceId,
+      marketplaceId: caller.marketplaceId || 'default',
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
     
+    console.log('Product request created:', requestRef.id);
     return res.json({ id: requestRef.id, message: 'Product request submitted' });
   } catch (error) {
     console.error('Error creating product request:', error);
@@ -264,9 +270,12 @@ app.get('/product-requests', verifyAuth, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const status = req.query.status as string;
+    const marketplaceId = caller.marketplaceId || 'default';
+    
+    console.log('Fetching product requests for marketplace:', marketplaceId, 'status:', status);
     
     let query = admin.firestore().collection('productRequests')
-      .where('marketplaceId', '==', caller.marketplaceId)
+      .where('marketplaceId', '==', marketplaceId)
       .orderBy('createdAt', 'desc');
     
     if (status) {
@@ -280,6 +289,7 @@ app.get('/product-requests', verifyAuth, async (req, res) => {
       createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
     }));
     
+    console.log('Found', requests.length, 'product requests');
     return res.json({ requests });
   } catch (error) {
     console.error('Error fetching product requests:', error);
@@ -347,7 +357,7 @@ app.post('/lost-items', verifyAuth, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const parsed = LostItemSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid request data' });
 
     const { itemName, description, contactDetails } = parsed.data;
     
@@ -357,7 +367,7 @@ app.post('/lost-items', verifyAuth, async (req, res) => {
       contactDetails,
       reporterId: caller.uid,
       reporterEmail: caller.email,
-      marketplaceId: caller.marketplaceId,
+      marketplaceId: caller.marketplaceId || 'default',
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -456,7 +466,7 @@ app.post('/donations', verifyAuth, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const parsed = DonationSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid request data' });
 
     const { itemName, description, contactDetails } = parsed.data;
     
@@ -466,7 +476,7 @@ app.post('/donations', verifyAuth, async (req, res) => {
       contactDetails,
       donorId: caller.uid,
       donorEmail: caller.email,
-      marketplaceId: caller.marketplaceId,
+      marketplaceId: caller.marketplaceId || 'default',
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp()
     });
