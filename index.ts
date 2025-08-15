@@ -205,19 +205,19 @@ app.delete('/marketplaces/:id', verifyAuth, async (req, res) => {
     await deleteCollection('donations', 'marketplaceId');
     await deleteCollection('messages', 'marketplaceId');
     
-    // Clear Firebase Auth claims for users with this marketplace ID
+    // Delete Firebase Auth users with this marketplace ID
     const listUsersResult = await admin.auth().listUsers(1000);
     for (const userRecord of listUsersResult.users) {
       const claims = userRecord.customClaims;
       if (claims?.marketplaceId === marketplaceId) {
-        await admin.auth().setCustomUserClaims(userRecord.uid, null);
+        await admin.auth().deleteUser(userRecord.uid);
       }
     }
     
     // Delete marketplace
     await admin.firestore().collection('marketplaces').doc(marketplaceId).delete();
     
-    return res.json({ success: true, message: 'Marketplace and all user claims deleted successfully' });
+    return res.json({ success: true, message: 'Marketplace and all users deleted successfully' });
   } catch (error) {
     console.error('Error deleting marketplace:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -266,12 +266,12 @@ app.post('/cleanup-orphaned-data', verifyAuth, async (req, res) => {
       }
     }
     
-    // Clear Firebase Auth claims for users with orphaned marketplace IDs
+    // Delete Firebase Auth users with orphaned marketplace IDs
     const listUsersResult = await admin.auth().listUsers(1000);
     for (const userRecord of listUsersResult.users) {
       const claims = userRecord.customClaims;
       if (claims?.marketplaceId && !activeMarketplaceIds.includes(claims.marketplaceId)) {
-        await admin.auth().setCustomUserClaims(userRecord.uid, null);
+        await admin.auth().deleteUser(userRecord.uid);
         clearedUsersCount++;
       }
     }
@@ -280,7 +280,7 @@ app.post('/cleanup-orphaned-data', verifyAuth, async (req, res) => {
       success: true, 
       deletedCount, 
       clearedUsersCount,
-      message: `Cleaned up ${deletedCount} orphaned records and cleared ${clearedUsersCount} user claims` 
+      message: `Cleaned up ${deletedCount} orphaned records and deleted ${clearedUsersCount} users` 
     });
   } catch (error) {
     console.error('Error cleaning orphaned data:', error);
