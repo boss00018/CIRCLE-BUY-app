@@ -370,6 +370,18 @@ app.put('/product-requests/:id/approve', verifyAuth, async (req, res) => {
     }
     
     const requestId = req.params.id;
+    
+    // Verify request belongs to admin's marketplace
+    const requestDoc = await admin.firestore().collection('productRequests').doc(requestId).get();
+    if (!requestDoc.exists) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    const request = requestDoc.data();
+    if (request?.marketplaceId !== caller.marketplaceId) {
+      return res.status(403).json({ error: 'Not authorized to approve this request' });
+    }
+    
     const approvalTime = admin.firestore.FieldValue.serverTimestamp();
     const expiryTime = new Date(Date.now() + 48 * 60 * 60 * 1000);
     
@@ -396,6 +408,17 @@ app.put('/product-requests/:id/reject', verifyAuth, async (req, res) => {
     
     const requestId = req.params.id;
     const { reason } = req.body;
+    
+    // Verify request belongs to admin's marketplace
+    const requestDoc = await admin.firestore().collection('productRequests').doc(requestId).get();
+    if (!requestDoc.exists) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    const request = requestDoc.data();
+    if (request?.marketplaceId !== caller.marketplaceId) {
+      return res.status(403).json({ error: 'Not authorized to reject this request' });
+    }
     
     await admin.firestore().collection('productRequests').doc(requestId).update({
       status: 'rejected',
@@ -487,6 +510,18 @@ app.put('/lost-items/:id/approve', verifyAuth, async (req, res) => {
     }
     
     const itemId = req.params.id;
+    
+    // Verify item belongs to admin's marketplace
+    const itemDoc = await admin.firestore().collection('lostItems').doc(itemId).get();
+    if (!itemDoc.exists) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    const item = itemDoc.data();
+    if (item?.marketplaceId !== caller.marketplaceId) {
+      return res.status(403).json({ error: 'Not authorized to approve this item' });
+    }
+    
     const approvalTime = admin.firestore.FieldValue.serverTimestamp();
     const expiryTime = new Date(Date.now() + 48 * 60 * 60 * 1000);
     
@@ -513,6 +548,17 @@ app.put('/lost-items/:id/reject', verifyAuth, async (req, res) => {
     
     const itemId = req.params.id;
     const { reason } = req.body;
+    
+    // Verify item belongs to admin's marketplace
+    const itemDoc = await admin.firestore().collection('lostItems').doc(itemId).get();
+    if (!itemDoc.exists) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    
+    const item = itemDoc.data();
+    if (item?.marketplaceId !== caller.marketplaceId) {
+      return res.status(403).json({ error: 'Not authorized to reject this item' });
+    }
     
     await admin.firestore().collection('lostItems').doc(itemId).update({
       status: 'rejected',
@@ -605,6 +651,17 @@ app.put('/donations/:id/approve', verifyAuth, async (req, res) => {
     
     const donationId = req.params.id;
     
+    // Verify donation belongs to admin's marketplace
+    const donationDoc = await admin.firestore().collection('donations').doc(donationId).get();
+    if (!donationDoc.exists) {
+      return res.status(404).json({ error: 'Donation not found' });
+    }
+    
+    const donation = donationDoc.data();
+    if (donation?.marketplaceId !== caller.marketplaceId) {
+      return res.status(403).json({ error: 'Not authorized to approve this donation' });
+    }
+    
     await admin.firestore().collection('donations').doc(donationId).update({
       status: 'approved',
       approvedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -628,6 +685,17 @@ app.put('/donations/:id/reject', verifyAuth, async (req, res) => {
     const donationId = req.params.id;
     const { reason } = req.body;
     
+    // Verify donation belongs to admin's marketplace
+    const donationDoc = await admin.firestore().collection('donations').doc(donationId).get();
+    if (!donationDoc.exists) {
+      return res.status(404).json({ error: 'Donation not found' });
+    }
+    
+    const donation = donationDoc.data();
+    if (donation?.marketplaceId !== caller.marketplaceId) {
+      return res.status(403).json({ error: 'Not authorized to reject this donation' });
+    }
+    
     await admin.firestore().collection('donations').doc(donationId).update({
       status: 'rejected',
       rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -648,14 +716,14 @@ app.put('/products/:id/mark-sold', verifyAuth, async (req, res) => {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const productId = req.params.id;
     
-    // Get product to verify ownership
+    // Get product to verify ownership and marketplace
     const productDoc = await admin.firestore().collection('products').doc(productId).get();
     if (!productDoc.exists) {
       return res.status(404).json({ error: 'Product not found' });
     }
     
     const product = productDoc.data();
-    if (!product || product.sellerId !== caller.uid) {
+    if (!product || product.sellerId !== caller.uid || product.marketplaceId !== caller.marketplaceId) {
       return res.status(403).json({ error: 'Not authorized to modify this product' });
     }
     
@@ -682,6 +750,14 @@ app.post('/messages', verifyAuth, verifyAuthorizedUser, async (req, res) => {
     
     if (!receiverId || !message?.trim()) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Verify receiver exists in same marketplace
+    const receiverRecord = await admin.auth().getUser(receiverId);
+    const receiverClaims = receiverRecord.customClaims;
+    
+    if (!receiverClaims?.marketplaceId || receiverClaims.marketplaceId !== caller.marketplaceId) {
+      return res.status(403).json({ error: 'Cannot send message to user from different marketplace' });
     }
     
     const messageRef = await admin.firestore().collection('messages').add({
@@ -713,13 +789,33 @@ app.get('/messages', verifyAuth, async (req, res) => {
       .limit(50);
     
     if (chatWith) {
-      // Get messages between caller and specific user
-      query = admin.firestore().collection('messages')
+      // Get messages between caller and specific user (same marketplace only)
+      const snapshot1 = await admin.firestore().collection('messages')
         .where('marketplaceId', '==', caller.marketplaceId)
-        .where('senderId', 'in', [caller.uid, chatWith])
-        .where('receiverId', 'in', [caller.uid, chatWith])
+        .where('senderId', '==', caller.uid)
+        .where('receiverId', '==', chatWith)
         .orderBy('createdAt', 'desc')
-        .limit(50);
+        .limit(25)
+        .get();
+      
+      const snapshot2 = await admin.firestore().collection('messages')
+        .where('marketplaceId', '==', caller.marketplaceId)
+        .where('senderId', '==', chatWith)
+        .where('receiverId', '==', caller.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(25)
+        .get();
+      
+      const messages = [...snapshot1.docs, ...snapshot2.docs]
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 50);
+      
+      return res.json({ messages });
     } else {
       // Get all messages for caller
       query = admin.firestore().collection('messages')
