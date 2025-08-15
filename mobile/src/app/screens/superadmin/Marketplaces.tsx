@@ -78,16 +78,28 @@ export default function Marketplaces() {
       
       console.log('Creating marketplace with domain:', sanitizedDomain);
       
-
-      
-      await firestore().collection('marketplaces').add({
-        name: sanitizedName,
-        domain: sanitizedDomain,
-        adminEmail: sanitizedEmail,
-        status: 'active',
-        createdAt: firestore.FieldValue.serverTimestamp(),
-        updatedAt: firestore.FieldValue.serverTimestamp()
+      // Create via server API
+      const token = await authRN().currentUser?.getIdToken();
+      const response = await fetch('https://circlebuy-server.onrender.com/marketplaces/create', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: sanitizedName,
+          domain: sanitizedDomain,
+          adminEmail: sanitizedEmail
+        })
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('Marketplace created via server:', result);
       
       setName('');
       setDomain('');

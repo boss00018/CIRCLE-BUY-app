@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import auth from '@react-native-firebase/auth';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../state/store';
+import { productRequestsApi } from '../../services/api';
 
 interface ProductRequest {
   id: string;
@@ -15,44 +16,7 @@ interface ProductRequest {
   status: string;
   createdAt: string;
   expiresAt?: string;
-  orphanedAt?: string;
 }
-
-// Global array to store submitted requests
-let globalProductRequests: any[] = [];
-
-export const getGlobalProductRequests = () => {
-  // Mark expired items as orphaned and filter them from active view
-  const now = new Date().toISOString();
-  
-  globalProductRequests.forEach(item => {
-    if (item.status === 'approved' && item.expiresAt && item.expiresAt <= now && item.status !== 'orphaned') {
-      item.status = 'orphaned';
-      item.orphanedAt = now;
-    }
-  });
-  
-  // Return only non-orphaned items for active display
-  return globalProductRequests.filter(item => item.status !== 'orphaned');
-};
-
-export const updateGlobalProductRequest = (id: string, updates: any) => {
-  const index = globalProductRequests.findIndex(item => item.id === id);
-  if (index !== -1) {
-    globalProductRequests[index] = { ...globalProductRequests[index], ...updates };
-  }
-};
-
-// Mark expired items as orphaned periodically
-setInterval(() => {
-  const now = new Date().toISOString();
-  globalProductRequests.forEach(item => {
-    if (item.status === 'approved' && item.expiresAt && item.expiresAt <= now) {
-      item.status = 'orphaned';
-      item.orphanedAt = now;
-    }
-  });
-}, 60000);
 
 export default function RequestProducts() {
   const insets = useSafeAreaInsets();
@@ -68,9 +32,13 @@ export default function RequestProducts() {
 
   useEffect(() => {
     if (activeTab === 'view') {
-      const loadApprovedRequests = () => {
-        const approvedRequests = globalProductRequests.filter(item => item.status === 'approved');
-        setRequests(approvedRequests);
+      const loadApprovedRequests = async () => {
+        try {
+          const response = await productRequestsApi.getAll('approved');
+          setRequests(response.requests || []);
+        } catch (error) {
+          console.error('Error loading requests:', error);
+        }
       };
       
       loadApprovedRequests();
@@ -87,23 +55,11 @@ export default function RequestProducts() {
 
     setSubmitting(true);
     try {
-      const user = auth().currentUser;
-      if (!user) throw new Error('Please login');
-
-      // Add to global array for admin to see
-      const newRequest = {
-        id: Date.now().toString(),
+      await productRequestsApi.create({
         productName: productName.trim(),
         description: description.trim(),
         contactDetails: contactDetails.trim(),
-        requesterId: user.uid,
-        requesterEmail: user.email,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      };
-      
-      globalProductRequests.push(newRequest);
-      console.log('Added request to global array:', newRequest);
+      });
 
       Alert.alert('Success', 'Product request submitted for admin approval.');
       setProductName('');
@@ -111,7 +67,7 @@ export default function RequestProducts() {
       setContactDetails('');
       setActiveTab('view');
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to submit request');
+      Alert.alert('Error', error.message || 'Failed to submit request');
     } finally {
       setSubmitting(false);
     }

@@ -3,11 +3,17 @@ import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import authRN from '@react-native-firebase/auth';
 
 export default function CleanupOrphaned() {
+  const [loading, setLoading] = React.useState(false);
+
   const cleanupOrphanedData = async () => {
+    if (loading) return;
+    setLoading(true);
     try {
       console.log('Starting server-side orphaned data cleanup...');
       
       const token = await authRN().currentUser?.getIdToken();
+      console.log('Token obtained, making request...');
+      
       const response = await fetch('https://circlebuy-server.onrender.com/cleanup-orphaned-data', {
         method: 'POST',
         headers: {
@@ -16,17 +22,22 @@ export default function CleanupOrphaned() {
         }
       });
       
+      console.log('Response status:', response.status);
+      
       if (response.ok) {
         const result = await response.json();
         console.log('Cleanup result:', result);
-        Alert.alert('Success', result.message);
+        Alert.alert('Success', `${result.message}\nDeleted: ${result.deletedCount} records`);
       } else {
-        console.error('Cleanup failed:', response.status);
-        Alert.alert('Error', 'Failed to cleanup orphaned data');
+        const errorText = await response.text();
+        console.error('Cleanup failed:', response.status, errorText);
+        Alert.alert('Error', `Failed to cleanup: ${errorText}`);
       }
     } catch (error: any) {
       console.error('Error cleaning up orphaned data:', error);
-      Alert.alert('Error', 'Failed to cleanup orphaned data');
+      Alert.alert('Error', `Connection failed: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -37,8 +48,16 @@ export default function CleanupOrphaned() {
         Remove orphaned data that belongs to deleted marketplaces
       </Text>
       
-      <Pressable onPress={cleanupOrphanedData} style={styles.cleanupButton}>
-        <Text style={styles.cleanupButtonText}>🗑️ Cleanup Orphaned Data</Text>
+
+      
+      <Pressable 
+        onPress={cleanupOrphanedData} 
+        disabled={loading}
+        style={[styles.cleanupButton, loading && styles.disabledButton]}
+      >
+        <Text style={styles.cleanupButtonText}>
+          {loading ? '🔄 Cleaning...' : '🗑️ Cleanup Orphaned Data'}
+        </Text>
       </Pressable>
     </View>
   );
@@ -71,5 +90,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 16,
+  },
+
+  disabledButton: {
+    backgroundColor: '#9ca3af',
   },
 });

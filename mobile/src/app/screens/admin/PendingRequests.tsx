@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
-import firestore from '@react-native-firebase/firestore';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../state/store';
-import { getGlobalProductRequests, updateGlobalProductRequest } from '../user/RequestProducts';
+import { productRequestsApi } from '../../services/api';
 
 interface ProductRequest {
   id: string;
@@ -21,10 +20,15 @@ export default function PendingRequests() {
   const { marketplaceId } = useSelector((s: RootState) => s.auth);
 
   useEffect(() => {
-    const loadPendingRequests = () => {
-      const pendingRequests = getGlobalProductRequests().filter((item: any) => item.status === 'pending');
-      setRequests(pendingRequests);
-      setLoading(false);
+    const loadPendingRequests = async () => {
+      try {
+        const response = await productRequestsApi.getAll('pending');
+        setRequests(response.requests || []);
+      } catch (error) {
+        console.error('Error loading pending requests:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     
     loadPendingRequests();
@@ -34,19 +38,14 @@ export default function PendingRequests() {
 
   const handleApprove = async (requestId: string) => {
     try {
-      const approvalTime = new Date().toISOString();
-      const expiryTime = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-      
-      updateGlobalProductRequest(requestId, { 
-        status: 'approved', 
-        updatedAt: approvalTime,
-        approvedAt: approvalTime,
-        expiresAt: expiryTime
-      });
-      
+      await productRequestsApi.approve(requestId);
       Alert.alert('Success', 'Product request approved and will be visible for 48 hours.');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to approve request.');
+      
+      // Refresh the list
+      const response = await productRequestsApi.getAll('pending');
+      setRequests(response.requests || []);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to approve request.');
     }
   };
 
@@ -62,14 +61,14 @@ export default function PendingRequests() {
           onPress: async (reason) => {
             if (!reason?.trim()) return;
             try {
-              updateGlobalProductRequest(requestId, {
-                status: 'rejected',
-                rejectionReason: reason.trim(),
-                updatedAt: new Date().toISOString()
-              });
+              await productRequestsApi.reject(requestId, reason.trim());
               Alert.alert('Success', 'Product request rejected.');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to reject request.');
+              
+              // Refresh the list
+              const response = await productRequestsApi.getAll('pending');
+              setRequests(response.requests || []);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to reject request.');
             }
           }
         }

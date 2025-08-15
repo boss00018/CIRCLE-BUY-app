@@ -39,9 +39,9 @@ export default function ProductDetails({ route, navigation }: any) {
 
   const startChat = () => {
     if (product) {
-      navigation.navigate('Chat', {
-        sellerId: product.sellerId,
-        sellerEmail: product.sellerEmail
+      navigation.navigate('Messages', {
+        receiverId: product.sellerId,
+        productId: product.id
       });
     }
   };

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Image, StyleSheet, Pressable, Alert } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
+import { productsApi } from '../../services/api';
 
 interface Product {
   id: string;
@@ -48,10 +49,10 @@ function ProductCard({ item }: { item: Product }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await firestore().collection('products').doc(item.id).delete();
-              console.log('Product marked as sold and removed');
-            } catch (error) {
-              console.error('Failed to mark product as sold');
+              await productsApi.markAsSold(item.id);
+              Alert.alert('Success', 'Product marked as sold and removed from marketplace.');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to mark product as sold');
             }
           }
         }

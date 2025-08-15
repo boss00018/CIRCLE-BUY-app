@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
-import firestore from '@react-native-firebase/firestore';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../state/store';
+import { donationsApi } from '../../services/api';
 
 interface Donation {
   id: string;
@@ -20,19 +20,31 @@ export default function PendingDonations() {
   const { marketplaceId } = useSelector((s: RootState) => s.auth);
 
   useEffect(() => {
-    setDonations([]);
-    setLoading(false);
+    const loadDonations = async () => {
+      try {
+        const response = await donationsApi.getAll('pending');
+        setDonations(response.donations || []);
+      } catch (error) {
+        console.error('Error loading pending donations:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadDonations();
+    const interval = setInterval(loadDonations, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleApprove = async (donationId: string) => {
     try {
-      await firestore().collection('donations').doc(donationId).update({
-        status: 'approved',
-        updatedAt: firestore.FieldValue.serverTimestamp()
-      });
+      await donationsApi.approve(donationId);
       Alert.alert('Success', 'Donation approved and published.');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to approve donation.');
+      
+      const response = await donationsApi.getAll('pending');
+      setDonations(response.donations || []);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to approve donation.');
     }
   };
 
@@ -48,14 +60,13 @@ export default function PendingDonations() {
           onPress: async (reason) => {
             if (!reason?.trim()) return;
             try {
-              await firestore().collection('donations').doc(donationId).update({
-                status: 'rejected',
-                rejectionReason: reason.trim(),
-                updatedAt: firestore.FieldValue.serverTimestamp()
-              });
+              await donationsApi.reject(donationId, reason.trim());
               Alert.alert('Success', 'Donation rejected.');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to reject donation.');
+              
+              const response = await donationsApi.getAll('pending');
+              setDonations(response.donations || []);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to reject donation.');
             }
           }
         }

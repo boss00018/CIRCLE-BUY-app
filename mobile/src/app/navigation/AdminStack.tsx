@@ -9,6 +9,7 @@ import { signOutLocal } from '../state/slices/authSlice';
 import { RootState } from '../state/store';
 import firestore from '@react-native-firebase/firestore';
 
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -153,6 +154,8 @@ function AdminDashboard({ navigation }: any) {
           <Text style={styles.statTitle}>Sold Products</Text>
         </View>
       </View>
+      
+
       
       <View style={styles.quickActions}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>

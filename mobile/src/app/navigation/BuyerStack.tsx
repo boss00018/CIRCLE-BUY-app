@@ -9,6 +9,9 @@ import Chat from '../screens/user/Chat';
 import ChatList from '../screens/user/ChatList';
 import LostItems from '../screens/user/LostItems';
 import RequestProducts from '../screens/user/RequestProducts';
+import Donations from '../screens/user/Donations';
+import Messages from '../screens/user/Messages';
+import { lostItemsApi, productRequestsApi } from '../services/api';
 import { View, Text, StyleSheet, Pressable, Alert, ScrollView } from 'react-native';
 import { brandHeaderOption } from './headers';
 import authRN from '@react-native-firebase/auth';
@@ -55,7 +58,7 @@ function MenuScreen({ navigation }: any) {
   const menuItems = [
     { title: 'Lost Items', icon: '🔍', action: () => navigation.navigate('LostItems') },
     { title: 'Request Products', icon: '📝', action: () => navigation.navigate('RequestProducts') },
-    { title: 'Donate Items', icon: '🎁', action: () => {} },
+    { title: 'Donate Items', icon: '🎁', action: () => navigation.navigate('Donations') },
     { title: 'Profile Settings', icon: '👤', action: () => {} },
     { title: 'Notifications', icon: '🔔', action: () => {} },
     { title: 'Help & Support', icon: '❓', action: () => {} },
@@ -95,18 +98,17 @@ function ProductRequestsAnnouncement({ navigation }: any) {
   const [scrollPosition, setScrollPosition] = React.useState(0);
   
   React.useEffect(() => {
-    const loadApprovedRequests = () => {
+    const loadApprovedRequests = async () => {
       try {
-        const { getGlobalProductRequests } = require('../screens/user/RequestProducts');
-        const approved = getGlobalProductRequests().filter((item: any) => item.status === 'approved');
-        setApprovedRequests(approved);
+        const response = await productRequestsApi.getAll('approved');
+        setApprovedRequests(response.requests || []);
       } catch (error) {
         setApprovedRequests([]);
       }
     };
     
     loadApprovedRequests();
-    const interval = setInterval(loadApprovedRequests, 2000);
+    const interval = setInterval(loadApprovedRequests, 1500);
     return () => clearInterval(interval);
   }, []);
   
@@ -163,18 +165,17 @@ function HomeWithAnnouncement({ navigation }: any) {
   const [scrollPosition, setScrollPosition] = React.useState(0);
   
   React.useEffect(() => {
-    const loadApprovedItems = () => {
+    const loadApprovedItems = async () => {
       try {
-        const { getGlobalLostItems } = require('../screens/user/LostItems');
-        const approved = getGlobalLostItems().filter((item: any) => item.status === 'approved');
-        setApprovedItems(approved);
+        const response = await lostItemsApi.getAll('approved');
+        setApprovedItems(response.items || []);
       } catch (error) {
         setApprovedItems([]);
       }
     };
     
     loadApprovedItems();
-    const interval = setInterval(loadApprovedItems, 2000);
+    const interval = setInterval(loadApprovedItems, 1500);
     return () => clearInterval(interval);
   }, []);
   
@@ -241,6 +242,8 @@ function HomeStack() {
       <Stack.Screen name="ChatList" component={ChatList} options={{ title: 'Messages' }} />
       <Stack.Screen name="LostItems" component={LostItems} options={{ title: 'Lost Items' }} />
       <Stack.Screen name="RequestProducts" component={RequestProducts} options={{ title: 'Request Products' }} />
+      <Stack.Screen name="Donations" component={Donations} options={{ title: 'Donations' }} />
+      <Stack.Screen name="Messages" component={Messages} options={{ title: 'Messages' }} />
     </Stack.Navigator>
   );
 }

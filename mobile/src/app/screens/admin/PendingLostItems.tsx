@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, Alert } from 'react-native';
-import firestore from '@react-native-firebase/firestore';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../state/store';
-import { getGlobalLostItems, updateGlobalLostItem } from '../user/LostItems';
+import { lostItemsApi } from '../../services/api';
 
 interface LostItem {
   id: string;
@@ -21,49 +20,31 @@ export default function PendingLostItems() {
   const { marketplaceId } = useSelector((s: RootState) => s.auth);
 
   useEffect(() => {
-    const loadItems = () => {
-      // Get submitted items from global array
-      const submittedItems = getGlobalLostItems().filter(item => item.status === 'pending');
-      
-      setItems(submittedItems);
-      setLoading(false);
+    const loadItems = async () => {
+      try {
+        const response = await lostItemsApi.getAll('pending');
+        setItems(response.items || []);
+      } catch (error) {
+        console.error('Error loading pending lost items:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     
     loadItems();
-    
-    // Refresh every 2 seconds to show new submissions
     const interval = setInterval(loadItems, 2000);
     return () => clearInterval(interval);
   }, []);
 
   const handleApprove = async (itemId: string) => {
     try {
-      const approvalTime = new Date().toISOString();
-      const expiryTime = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(); // 48 hours from now
-      
-      // Update in global array with expiry
-      updateGlobalLostItem(itemId, { 
-        status: 'approved', 
-        updatedAt: approvalTime,
-        approvedAt: approvalTime,
-        expiresAt: expiryTime
-      });
-      
-      // Try Firestore as backup
-      try {
-        await firestore().collection('lostItems').doc(itemId).update({
-          status: 'approved',
-          updatedAt: firestore.FieldValue.serverTimestamp(),
-          approvedAt: firestore.FieldValue.serverTimestamp(),
-          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000)
-        });
-      } catch (firestoreError) {
-        console.log('Firestore update failed, using global array');
-      }
-      
+      await lostItemsApi.approve(itemId);
       Alert.alert('Success', 'Lost item approved and will be visible for 48 hours.');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to approve item.');
+      
+      const response = await lostItemsApi.getAll('pending');
+      setItems(response.items || []);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to approve item.');
     }
   };
 
@@ -79,14 +60,13 @@ export default function PendingLostItems() {
           onPress: async (reason) => {
             if (!reason?.trim()) return;
             try {
-              await firestore().collection('lostItems').doc(itemId).update({
-                status: 'rejected',
-                rejectionReason: reason.trim(),
-                updatedAt: firestore.FieldValue.serverTimestamp()
-              });
+              await lostItemsApi.reject(itemId, reason.trim());
               Alert.alert('Success', 'Lost item rejected.');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to reject item.');
+              
+              const response = await lostItemsApi.getAll('pending');
+              setItems(response.items || []);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to reject item.');
             }
           }
         }
