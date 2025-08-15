@@ -32,7 +32,7 @@ export default function PendingDonations() {
     };
     
     loadDonations();
-    const interval = setInterval(loadDonations, 2000);
+    const interval = setInterval(loadDonations, 10000);
     return () => clearInterval(interval);
   }, []);
 

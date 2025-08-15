@@ -32,7 +32,7 @@ export default function PendingLostItems() {
     };
     
     loadItems();
-    const interval = setInterval(loadItems, 2000);
+    const interval = setInterval(loadItems, 10000);
     return () => clearInterval(interval);
   }, []);
 

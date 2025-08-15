@@ -32,7 +32,7 @@ export default function PendingRequests() {
     };
     
     loadPendingRequests();
-    const interval = setInterval(loadPendingRequests, 2000);
+    const interval = setInterval(loadPendingRequests, 10000);
     return () => clearInterval(interval);
   }, []);
 

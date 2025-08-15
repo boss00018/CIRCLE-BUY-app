@@ -55,6 +55,34 @@ async function verifyAuth(req: any, res: any, next: any) {
   }
 }
 
+async function verifyAuthorizedUser(req: any, res: any, next: any) {
+  const caller = (req as any).user as admin.auth.DecodedIdToken;
+  
+  // Check if user has a valid role and marketplace
+  if (!caller.role || !caller.marketplaceId) {
+    return res.status(403).json({ error: 'Unauthorized. Please complete registration first.' });
+  }
+  
+  // Check if user's email domain is authorized
+  const emailDomain = caller.email?.split('@')[1];
+  if (!emailDomain) {
+    return res.status(403).json({ error: 'Invalid email format' });
+  }
+  
+  const publicDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'];
+  if (publicDomains.includes(emailDomain.toLowerCase())) {
+    return res.status(403).json({ error: 'Unauthorized domain. Please login with your university email.' });
+  }
+  
+  // Verify marketplace exists and is active
+  const marketplaceDoc = await admin.firestore().collection('marketplaces').doc(caller.marketplaceId).get();
+  if (!marketplaceDoc.exists || marketplaceDoc.data()?.status !== 'active') {
+    return res.status(403).json({ error: 'Marketplace not found or inactive' });
+  }
+  
+  return next();
+}
+
 app.post('/auth/assign-role', verifyAuth, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
@@ -234,7 +262,7 @@ const ProductRequestSchema = z.object({
   contactDetails: z.string().min(1)
 });
 
-app.post('/product-requests', verifyAuth, async (req, res) => {
+app.post('/product-requests', verifyAuth, verifyAuthorizedUser, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     console.log('Product request from user:', caller.email, 'marketplace:', caller.marketplaceId);
@@ -357,7 +385,7 @@ const LostItemSchema = z.object({
   contactDetails: z.string().min(1)
 });
 
-app.post('/lost-items', verifyAuth, async (req, res) => {
+app.post('/lost-items', verifyAuth, verifyAuthorizedUser, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const parsed = LostItemSchema.safeParse(req.body);
@@ -474,7 +502,7 @@ const DonationSchema = z.object({
   contactDetails: z.string().min(1)
 });
 
-app.post('/donations', verifyAuth, async (req, res) => {
+app.post('/donations', verifyAuth, verifyAuthorizedUser, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const parsed = DonationSchema.safeParse(req.body);
@@ -614,7 +642,7 @@ app.put('/products/:id/mark-sold', verifyAuth, async (req, res) => {
 });
 
 // Messages endpoints
-app.post('/messages', verifyAuth, async (req, res) => {
+app.post('/messages', verifyAuth, verifyAuthorizedUser, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const { receiverId, productId, message } = req.body;
