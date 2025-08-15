@@ -10,7 +10,13 @@ if (!admin.apps.length) {
   try {
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       // Parse the JSON credentials from environment variable
-      const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      let serviceAccount;
+      try {
+        serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      } catch (jsonError) {
+        console.error('Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS:', jsonError);
+        throw jsonError;
+      }
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
@@ -210,7 +216,11 @@ app.delete('/marketplaces/:id', verifyAuth, async (req, res) => {
     for (const userRecord of listUsersResult.users) {
       const claims = userRecord.customClaims;
       if (claims?.marketplaceId === marketplaceId) {
-        await admin.auth().deleteUser(userRecord.uid);
+        try {
+          await admin.auth().deleteUser(userRecord.uid);
+        } catch (error) {
+          console.error(`Failed to delete user ${userRecord.uid}:`, error);
+        }
       }
     }
     
@@ -271,8 +281,12 @@ app.post('/cleanup-orphaned-data', verifyAuth, async (req, res) => {
     for (const userRecord of listUsersResult.users) {
       const claims = userRecord.customClaims;
       if (claims?.marketplaceId && !activeMarketplaceIds.includes(claims.marketplaceId)) {
-        await admin.auth().deleteUser(userRecord.uid);
-        clearedUsersCount++;
+        try {
+          await admin.auth().deleteUser(userRecord.uid);
+          clearedUsersCount++;
+        } catch (error) {
+          console.error(`Failed to delete user ${userRecord.uid}:`, error);
+        }
       }
     }
     
