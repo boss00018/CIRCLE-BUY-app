@@ -137,5 +137,91 @@ app.get('/marketplaces', verifyAuth, async (req, res) => {
   }
 });
 
+// Delete marketplace
+app.delete('/marketplaces/:id', verifyAuth, async (req, res) => {
+  try {
+    const caller = (req as any).user as admin.auth.DecodedIdToken;
+    if (caller.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+    
+    const marketplaceId = req.params.id;
+    
+    // Delete marketplace data in batches
+    const deleteCollection = async (collectionName: string, field: string) => {
+      const query = admin.firestore().collection(collectionName).where(field, '==', marketplaceId).limit(500);
+      let snapshot = await query.get();
+      
+      while (!snapshot.empty) {
+        const batch = admin.firestore().batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        snapshot = await query.get();
+      }
+    };
+    
+    // Delete related data
+    await deleteCollection('products', 'marketplaceId');
+    await deleteCollection('users', 'marketplaceId');
+    await deleteCollection('chats', 'marketplaceId');
+    await deleteCollection('lostFound', 'marketplaceId');
+    await deleteCollection('productRequests', 'marketplaceId');
+    
+    // Delete marketplace
+    await admin.firestore().collection('marketplaces').doc(marketplaceId).delete();
+    
+    return res.json({ success: true, message: 'Marketplace deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting marketplace:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Cleanup orphaned data
+app.post('/cleanup-orphaned-data', verifyAuth, async (req, res) => {
+  try {
+    const caller = (req as any).user as admin.auth.DecodedIdToken;
+    if (caller.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+    
+    // Get all active marketplace IDs
+    const marketplacesSnapshot = await admin.firestore().collection('marketplaces').get();
+    const activeMarketplaceIds = marketplacesSnapshot.docs.map(doc => doc.id);
+    
+    let deletedCount = 0;
+    
+    // Clean orphaned data from multiple collections
+    const collections = ['products', 'users', 'chats', 'lostFound', 'productRequests'];
+    
+    for (const collectionName of collections) {
+      const snapshot = await admin.firestore().collection(collectionName).get();
+      const batch = admin.firestore().batch();
+      let batchCount = 0;
+      
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (data.marketplaceId && !activeMarketplaceIds.includes(data.marketplaceId)) {
+          batch.delete(doc.ref);
+          deletedCount++;
+          batchCount++;
+          
+          // Commit batch every 500 operations
+          if (batchCount >= 500) {
+            await batch.commit();
+            batchCount = 0;
+          }
+        }
+      }
+      
+      // Commit remaining operations
+      if (batchCount > 0) {
+        await batch.commit();
+      }
+    }
+    
+    return res.json({ success: true, deletedCount, message: `Cleaned up ${deletedCount} orphaned records` });
+  } catch (error) {
+    console.error('Error cleaning orphaned data:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 const PORT = parseInt(process.env.PORT || '8000', 10);
 app.listen(PORT, '0.0.0.0', () => console.log(`CircleBuy server with full Firebase features listening on 0.0.0.0:${PORT}`));
