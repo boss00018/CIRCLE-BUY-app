@@ -8,7 +8,7 @@ export default function CleanupOrphaned() {
       console.log('Starting server-side orphaned data cleanup...');
       
       const token = await authRN().currentUser?.getIdToken();
-      const response = await fetch('http://192.168.0.8:8000/cleanup-orphaned-data', {
+      const response = await fetch('https://circlebuy-server.onrender.com/cleanup-orphaned-data', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -135,7 +135,7 @@ export default function Marketplaces() {
                 
                 // Call server endpoint for complete deletion
                 const token = await authRN().currentUser?.getIdToken();
-                const response = await fetch(`http://192.168.0.8:8000/marketplaces/${id}`, {
+                const response = await fetch(`https://circlebuy-server.onrender.com/marketplaces/${id}`, {
                   method: 'DELETE',
                   headers: {
                     'Authorization': `Bearer ${token}`,
@@ -146,22 +146,12 @@ export default function Marketplaces() {
                 if (response.ok) {
                   const result = await response.json();
                   console.log('Server deletion result:', result);
+                  Alert.alert('Success', 'Marketplace and all associated data deleted successfully');
                 } else {
                   console.error('Server deletion failed:', response.status);
+                  const errorText = await response.text();
+                  Alert.alert('Error', `Failed to delete marketplace: ${errorText}`);
                 }
-                
-                console.log('=== SERVER-SIDE DELETION COMPLETE ===');
-                
-                // Delete all users
-                const usersSnapshot = await firestore().collection('users').get();
-                for (const doc of usersSnapshot.docs) {
-                  await firestore().collection('users').doc(doc.id).delete();
-                }
-                
-                // Delete marketplace
-                await firestore().collection('marketplaces').doc(id).delete();
-                
-                Alert.alert('Success', `Deleted marketplace and ${productsSnapshot.size} products`);
               } catch (error) {
                 Alert.alert('Error', error.message);
               }
