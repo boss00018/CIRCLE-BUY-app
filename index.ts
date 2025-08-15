@@ -564,7 +564,7 @@ app.put('/products/:id/mark-sold', verifyAuth, async (req, res) => {
     }
     
     const product = productDoc.data();
-    if (product.sellerId !== caller.uid) {
+    if (!product || product.sellerId !== caller.uid) {
       return res.status(403).json({ error: 'Not authorized to modify this product' });
     }
     
