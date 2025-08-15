@@ -274,20 +274,24 @@ app.get('/product-requests', verifyAuth, async (req, res) => {
     
     console.log('Fetching product requests for marketplace:', marketplaceId, 'status:', status);
     
-    let query = admin.firestore().collection('productRequests')
+    // Simple query to avoid composite index requirement
+    const snapshot = await admin.firestore().collection('productRequests')
       .where('marketplaceId', '==', marketplaceId)
-      .orderBy('createdAt', 'desc');
+      .get();
     
-    if (status) {
-      query = query.where('status', '==', status);
-    }
-    
-    const snapshot = await query.get();
-    const requests = snapshot.docs.map(doc => ({
+    let requests = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
     }));
+    
+    // Filter by status in memory if needed
+    if (status) {
+      requests = requests.filter((req: any) => req.status === status);
+    }
+    
+    // Sort by createdAt in memory
+    requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     
     console.log('Found', requests.length, 'product requests');
     return res.json({ requests });
@@ -383,22 +387,30 @@ app.get('/lost-items', verifyAuth, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const status = req.query.status as string;
+    const marketplaceId = caller.marketplaceId || 'default';
     
-    let query = admin.firestore().collection('lostItems')
-      .where('marketplaceId', '==', caller.marketplaceId)
-      .orderBy('createdAt', 'desc');
+    console.log('Fetching lost items for marketplace:', marketplaceId, 'status:', status);
     
-    if (status) {
-      query = query.where('status', '==', status);
-    }
+    // Simple query to avoid composite index requirement
+    const snapshot = await admin.firestore().collection('lostItems')
+      .where('marketplaceId', '==', marketplaceId)
+      .get();
     
-    const snapshot = await query.get();
-    const items = snapshot.docs.map(doc => ({
+    let items = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
     }));
     
+    // Filter by status in memory if needed
+    if (status) {
+      items = items.filter((item: any) => item.status === status);
+    }
+    
+    // Sort by createdAt in memory
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    console.log('Found', items.length, 'lost items');
     return res.json({ items });
   } catch (error) {
     console.error('Error fetching lost items:', error);
@@ -492,22 +504,30 @@ app.get('/donations', verifyAuth, async (req, res) => {
   try {
     const caller = (req as any).user as admin.auth.DecodedIdToken;
     const status = req.query.status as string;
+    const marketplaceId = caller.marketplaceId || 'default';
     
-    let query = admin.firestore().collection('donations')
-      .where('marketplaceId', '==', caller.marketplaceId)
-      .orderBy('createdAt', 'desc');
+    console.log('Fetching donations for marketplace:', marketplaceId, 'status:', status);
     
-    if (status) {
-      query = query.where('status', '==', status);
-    }
+    // Simple query to avoid composite index requirement
+    const snapshot = await admin.firestore().collection('donations')
+      .where('marketplaceId', '==', marketplaceId)
+      .get();
     
-    const snapshot = await query.get();
-    const donations = snapshot.docs.map(doc => ({
+    let donations = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
     }));
     
+    // Filter by status in memory if needed
+    if (status) {
+      donations = donations.filter((donation: any) => donation.status === status);
+    }
+    
+    // Sort by createdAt in memory
+    donations.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    console.log('Found', donations.length, 'donations');
     return res.json({ donations });
   } catch (error) {
     console.error('Error fetching donations:', error);
