@@ -9,6 +9,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["server/src/index.ts"],
+  "include": ["index.ts"],
   "exclude": ["node_modules", "dist"]
 }
