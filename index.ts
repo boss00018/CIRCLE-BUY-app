@@ -58,12 +58,7 @@ async function verifyAuth(req: any, res: any, next: any) {
 async function verifyAuthorizedUser(req: any, res: any, next: any) {
   const caller = (req as any).user as admin.auth.DecodedIdToken;
   
-  // Check if user has a valid role and marketplace
-  if (!caller.role || !caller.marketplaceId) {
-    return res.status(403).json({ error: 'Unauthorized. Please complete registration first.' });
-  }
-  
-  // Check if user's email domain is authorized
+  // Check if user's email domain is authorized first
   const emailDomain = caller.email?.split('@')[1];
   if (!emailDomain) {
     return res.status(403).json({ error: 'Invalid email format' });
@@ -74,10 +69,23 @@ async function verifyAuthorizedUser(req: any, res: any, next: any) {
     return res.status(403).json({ error: 'Unauthorized domain. Please login with your university email.' });
   }
   
-  // Verify marketplace exists and is active
-  const marketplaceDoc = await admin.firestore().collection('marketplaces').doc(caller.marketplaceId).get();
-  if (!marketplaceDoc.exists || marketplaceDoc.data()?.status !== 'active') {
-    return res.status(403).json({ error: 'Marketplace not found or inactive' });
+  // If no role/marketplace, try to assign them automatically
+  if (!caller.role || !caller.marketplaceId) {
+    const marketplaceSnap = await admin.firestore().collection('marketplaces').where('domain', '==', emailDomain.toLowerCase()).where('status', '==', 'active').limit(1).get();
+    
+    if (marketplaceSnap.empty) {
+      return res.status(403).json({ error: 'No active marketplace found for your domain' });
+    }
+    
+    const marketplace = marketplaceSnap.docs[0];
+    const marketplaceId = marketplace.id;
+    
+    // Auto-assign role and marketplace
+    await admin.auth().setCustomUserClaims(caller.uid, { role: 'user', marketplaceId });
+    
+    // Update the caller object for this request
+    caller.role = 'user';
+    caller.marketplaceId = marketplaceId;
   }
   
   return next();
