@@ -5,30 +5,18 @@ import morgan from 'morgan';
 import admin from 'firebase-admin';
 import { z } from 'zod';
 
-// Initialize Firebase Admin with environment variables only
+// Initialize Firebase Admin
 if (!admin.apps.length) {
   try {
-    if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
-      const serviceAccount = {
-        type: "service_account",
-        project_id: process.env.FIREBASE_PROJECT_ID || "circlebuy-5a8d9",
-        private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-        private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        client_email: process.env.FIREBASE_CLIENT_EMAIL,
-        client_id: process.env.FIREBASE_CLIENT_ID,
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-        client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-        universe_domain: "googleapis.com"
-      };
-      
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      // Parse the JSON credentials from environment variable
+      const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
       admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+        credential: admin.credential.cert(serviceAccount),
       });
-      console.log('Firebase initialized with environment variables');
+      console.log('Firebase initialized with GOOGLE_APPLICATION_CREDENTIALS');
     } else {
-      console.log('Firebase credentials not found in environment variables');
+      console.log('No Firebase credentials found');
       admin.initializeApp({ projectId: "circlebuy-5a8d9" });
     }
   } catch (error) {
@@ -150,4 +138,4 @@ app.get('/marketplaces', verifyAuth, async (req, res) => {
 });
 
 const PORT = parseInt(process.env.PORT || '8000', 10);
-app.listen(PORT, '0.0.0.0', () => console.log(`CircleBuy server with full features listening on 0.0.0.0:${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`CircleBuy server with full Firebase features listening on 0.0.0.0:${PORT}`));
