@@ -113,6 +113,18 @@ app.post('/auth/assign-role', verifyAuth, async (req, res) => {
       const marketplace = adminMarketplaceSnap.docs[0];
       const marketplaceId = marketplace.id;
       await admin.auth().setCustomUserClaims(caller.uid, { role: 'admin', marketplaceId });
+      
+      // Create/update user in Firestore
+      await admin.firestore().collection('users').doc(caller.uid).set({
+        email: caller.email,
+        name: caller.name || 'Admin User',
+        photoURL: caller.picture || null,
+        marketplaceId,
+        role: 'admin',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      
       return res.json({ role: 'admin', marketplaceId });
     }
     
@@ -134,6 +146,18 @@ app.post('/auth/assign-role', verifyAuth, async (req, res) => {
     const marketplaceId = marketplace.id;
     
     await admin.auth().setCustomUserClaims(caller.uid, { role: 'user', marketplaceId });
+    
+    // Create/update user in Firestore
+    await admin.firestore().collection('users').doc(caller.uid).set({
+      email: caller.email,
+      name: caller.name || caller.email?.split('@')[0] || 'User',
+      photoURL: caller.picture || null,
+      marketplaceId,
+      role: 'user',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    
     return res.json({ role: 'user', marketplaceId });
     
   } catch (error) {
@@ -283,6 +307,73 @@ app.delete('/marketplaces/:id', verifyAuth, async (req, res) => {
     return res.json({ success: true, message: 'Marketplace and all users deleted successfully' });
   } catch (error) {
     console.error('Error deleting marketplace:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Migrate existing users to have marketplaceId
+app.post('/migrate-users', verifyAuth, async (req, res) => {
+  try {
+    const caller = (req as any).user as admin.auth.DecodedIdToken;
+    if (caller.role !== 'super_admin') return res.status(403).json({ error: 'Forbidden' });
+    
+    let migratedCount = 0;
+    
+    // Get all users from Firestore
+    const usersSnapshot = await admin.firestore().collection('users').get();
+    
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      
+      // Skip if already has marketplaceId
+      if (userData.marketplaceId) continue;
+      
+      const email = userData.email;
+      if (!email) continue;
+      
+      const emailDomain = email.split('@')[1];
+      if (!emailDomain) continue;
+      
+      // Find marketplace for this domain
+      const marketplaceSnap = await admin.firestore().collection('marketplaces')
+        .where('domain', '==', emailDomain.toLowerCase())
+        .where('status', '==', 'active')
+        .limit(1)
+        .get();
+      
+      if (!marketplaceSnap.empty) {
+        const marketplace = marketplaceSnap.docs[0];
+        const marketplaceId = marketplace.id;
+        
+        // Update user with marketplaceId
+        await admin.firestore().collection('users').doc(userDoc.id).update({
+          marketplaceId,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Also update Firebase Auth claims
+        try {
+          const userRecord = await admin.auth().getUser(userDoc.id);
+          const isAdmin = email === marketplace.data().adminEmail;
+          await admin.auth().setCustomUserClaims(userDoc.id, { 
+            role: isAdmin ? 'admin' : 'user', 
+            marketplaceId 
+          });
+        } catch (authError) {
+          console.error(`Failed to update auth claims for user ${userDoc.id}:`, authError);
+        }
+        
+        migratedCount++;
+      }
+    }
+    
+    return res.json({ 
+      success: true, 
+      migratedCount,
+      message: `Migrated ${migratedCount} users` 
+    });
+  } catch (error) {
+    console.error('Error migrating users:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

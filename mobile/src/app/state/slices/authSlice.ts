@@ -35,7 +35,7 @@ export const bootstrapAuth = createAsyncThunk('auth/bootstrap', async () => {
         // Verify with backend server
         try {
           const token = await user.getIdToken();
-          const response = await fetch('http://192.168.0.8:8000/auth/assign-role', {
+          const response = await fetch('https://circlebuy-server.onrender.com/auth/assign-role', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,

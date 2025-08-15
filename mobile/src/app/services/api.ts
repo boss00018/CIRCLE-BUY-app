@@ -121,4 +121,7 @@ export const superAdminApi = {
   
   cleanupOrphanedData: () =>
     apiRequest('/cleanup-orphaned-data', { method: 'POST' }),
+  
+  migrateUsers: () =>
+    apiRequest('/migrate-users', { method: 'POST' }),
 };

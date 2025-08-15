@@ -1,43 +1,34 @@
 import React from 'react';
 import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
-import authRN from '@react-native-firebase/auth';
+import { superAdminApi } from '../../services/api';
 
 export default function CleanupOrphaned() {
   const [loading, setLoading] = React.useState(false);
+  const [migrating, setMigrating] = React.useState(false);
 
   const cleanupOrphanedData = async () => {
     if (loading) return;
     setLoading(true);
     try {
-      console.log('Starting server-side orphaned data cleanup...');
-      
-      const token = await authRN().currentUser?.getIdToken();
-      console.log('Token obtained, making request...');
-      
-      const response = await fetch('https://circlebuy-server.onrender.com/cleanup-orphaned-data', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('Response status:', response.status);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Cleanup result:', result);
-        Alert.alert('Success', `${result.message}\nDeleted: ${result.deletedCount} records`);
-      } else {
-        const errorText = await response.text();
-        console.error('Cleanup failed:', response.status, errorText);
-        Alert.alert('Error', `Failed to cleanup: ${errorText}`);
-      }
+      const result = await superAdminApi.cleanupOrphanedData();
+      Alert.alert('Success', `${result.message}\nDeleted: ${result.deletedCount} records`);
     } catch (error: any) {
-      console.error('Error cleaning up orphaned data:', error);
-      Alert.alert('Error', `Connection failed: ${error.message}`);
+      Alert.alert('Error', `Failed to cleanup: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const migrateUsers = async () => {
+    if (migrating) return;
+    setMigrating(true);
+    try {
+      const result = await superAdminApi.migrateUsers();
+      Alert.alert('Success', `${result.message}\nMigrated: ${result.migratedCount} users`);
+    } catch (error: any) {
+      Alert.alert('Error', `Failed to migrate: ${error.message}`);
+    } finally {
+      setMigrating(false);
     }
   };
 
@@ -45,10 +36,18 @@ export default function CleanupOrphaned() {
     <View style={styles.container}>
       <Text style={styles.title}>🧹 Data Cleanup</Text>
       <Text style={styles.description}>
-        Remove orphaned data that belongs to deleted marketplaces
+        Migrate existing users and cleanup orphaned data
       </Text>
       
-
+      <Pressable 
+        onPress={migrateUsers} 
+        disabled={migrating}
+        style={[styles.migrateButton, migrating && styles.disabledButton]}
+      >
+        <Text style={styles.migrateButtonText}>
+          {migrating ? '🔄 Migrating...' : '👥 Migrate Users'}
+        </Text>
+      </Pressable>
       
       <Pressable 
         onPress={cleanupOrphanedData} 
@@ -80,6 +79,18 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginBottom: 24,
   },
+  migrateButton: {
+    backgroundColor: '#3b82f6',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  migrateButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
   cleanupButton: {
     backgroundColor: '#dc2626',
     padding: 16,
@@ -91,7 +102,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-
   disabledButton: {
     backgroundColor: '#9ca3af',
   },
